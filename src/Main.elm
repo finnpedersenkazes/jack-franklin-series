@@ -1,10 +1,11 @@
-module Main exposing (..)
+port module Main exposing (..)
 
 import Browser exposing (Document, UrlRequest)
 import Browser.Navigation exposing (Key)
 import Html exposing (Html, div, h1, img, text)
 import Html.Attributes exposing (src)
 import Url exposing (Url)
+import Url.Parser as Parser exposing ((</>))
 
 
 
@@ -30,6 +31,12 @@ init flags url key =
     let
         _ =
             Debug.log "url" url
+
+        parsedUrl =
+            Parser.parse routeParser url
+
+        _ =
+            Debug.log "parsed URL " parsedUrl
 
         parts : List String
         parts =
@@ -65,11 +72,19 @@ init flags url key =
 
         newModel : Model
         newModel =
-            { token = tokenAlternative2
+            { token = Nothing
             , navigationKey = key
             }
+
+        commands =
+            case token of
+                Just (Token tokenString) ->
+                    sendTokenToStorage tokenString
+
+                Nothing ->
+                    Cmd.none
     in
-    ( newModel, Cmd.none )
+    ( newModel, commands )
 
 
 
@@ -78,6 +93,18 @@ init flags url key =
 
 type Msg
     = NoOp
+
+
+type Route
+    = SignIn String
+    | NotFound
+
+
+routeParser : Parser.Parser (Route -> a) a
+routeParser =
+    Parser.oneOf
+        [ Parser.map SignIn (Parser.s "signin" </> Parser.string)
+        ]
 
 
 onUrlRequest : UrlRequest -> Msg
@@ -124,3 +151,6 @@ main =
         , onUrlRequest = onUrlRequest
         , onUrlChange = onUrlChange
         }
+
+
+port sendTokenToStorage : String -> Cmd msg
