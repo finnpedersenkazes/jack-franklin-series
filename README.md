@@ -3,8 +3,11 @@
 ## Jack Franklin - Building apps in Elm
 
 [Part 1: Getting started](https://www.youtube.com/watch?v=r44D650szpg&t=326s)
+
 [Part 2: Parsing URLs](https://www.youtube.com/watch?v=y7B-8IcEpzA)
+
 [Part 3: Storing the user's token](https://www.youtube.com/watch?v=TsN0dojUNBk)
+
 [Part 4: Passing in data with flags](https://www.youtube.com/watch?v=LLlvU5QgrBM)
 
 
