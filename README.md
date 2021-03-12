@@ -1,12 +1,49 @@
 # Building apps in Elm
 
+The intension with this project is to follow along the series by Jack Franklin.
+
+Currently I am in trouble, because the signin to Github escapes me, but I kind of hope that it will become clear later.
+
 ## Jack Franklin - Building apps in Elm
 
 - [Part 1: Getting started](https://www.youtube.com/watch?v=r44D650szpg&t=326s)
 - [Part 2: Parsing URLs](https://www.youtube.com/watch?v=y7B-8IcEpzA)
 - [Part 3: Storing the user's token](https://www.youtube.com/watch?v=TsN0dojUNBk)
 - [Part 4: Passing in data with flags](https://www.youtube.com/watch?v=LLlvU5QgrBM)
+- [Part 5: Fetching user data with Elm's HTTP library](https://www.youtube.com/watch?v=0Hku1kB6gIo)
 
+## Auth0
+
+OK. I gave up trying to continue without getting the token.
+The *black magic* part in Jack's Getting Started Part 1.
+
+So now I am looking into auth0.com.
+
+- https://auth0.com/docs/get-started/learn-the-basics
+
+- Tenant name: `jack-franklin-elm-01`
+- Domain name: `jack-franklin-elm-01.eu.auth0.com`
+
+
+
+### interesting elm packages
+
+- https://package.elm-lang.org/packages/kkpoon/elm-auth0/latest
+- https://package.elm-lang.org/packages/kkpoon/elm-auth0-urlparser/latest/Auth0-UrlParser
+
+## JWT
+
+
+### interesting elm packages
+
+-https://package.elm-lang.org/packages/simonh1000/elm-jwt/latest/
+
+## OAuth 2
+
+### interesting elm packages
+
+- https://package.elm-lang.org/packages/solcates/solcates-elm-oauth2/latest/
+- https://package.elm-lang.org/packages/truqu/elm-oauth2/latest/
 
 # Elm App
 

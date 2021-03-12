@@ -1,11 +1,27 @@
 port module Main exposing (..)
 
 import Browser exposing (Document, UrlRequest)
-import Browser.Navigation exposing (Key)
-import Html exposing (Html, div, h1, img, text)
-import Html.Attributes exposing (src)
-import Url exposing (Url)
+import Browser.Navigation as Nav exposing (Key)
+import Html exposing (Html, a, br, button, div, h1, h2, img, text)
+import Html.Attributes as Attr exposing (class, href, src, type_)
+import Html.Events exposing (onClick)
+import Http
+import Json.Encode as Encode
+import Url exposing (Url, toString)
 import Url.Parser as Parser exposing ((</>))
+import User exposing (LoggedInUser, UnverifiedUser, UserInfo, unverifiedToUserInfo, unverifiedUserEncoder, userInfoDecoder)
+import UserAPI exposing (userRequest)
+import UserAuth0 exposing (AuthStatus(..), auth0Endpoint, auth0LoginUrl, auth0Token)
+
+
+
+-- PORTS
+
+
+port saveAccessToken : String -> Cmd msg
+
+
+port removeAccessToken : () -> Cmd msg
 
 
 
@@ -13,17 +29,25 @@ import Url.Parser as Parser exposing ((</>))
 
 
 type alias Flags =
-    {}
-
-
-type Token
-    = Token String
+    { maybeAccessToken : Maybe String }
 
 
 type alias Model =
-    { token : Maybe Token
-    , navigationKey : Key
+    { url : Url
+    , key : Key
+    , page : Page
+    , auth : AuthStatus
     }
+
+
+type Page
+    = NotFound
+    | About
+    | LoggedIn
+
+
+
+-- INIT
 
 
 init : Flags -> Url -> Key -> ( Model, Cmd Msg )
@@ -32,59 +56,25 @@ init flags url key =
         _ =
             Debug.log "url" url
 
-        parsedUrl =
-            Parser.parse routeParser url
+        { maybeAccessToken } =
+            flags
 
         _ =
-            Debug.log "parsed URL " parsedUrl
-
-        parts : List String
-        parts =
-            Debug.log "parts" (String.split "/" url.path)
-
-        firstPart : Maybe String
-        firstPart =
-            List.reverse parts |> List.head
-
-        token : Maybe Token
-        token =
-            case firstPart of
-                Nothing ->
-                    Nothing
-
-                Just tokenString ->
-                    Just (Token tokenString)
-
-        tokenAlternative1 : Maybe Token
-        tokenAlternative1 =
-            Maybe.map Token firstPart
-
-        tokenAlternative2 : Maybe Token
-        tokenAlternative2 =
-            url.path
-                |> String.split "/"
-                |> List.reverse
-                |> List.head
-                |> Maybe.map Token
-
-        _ =
-            Debug.log "token" token
-
-        newModel : Model
-        newModel =
-            { token = Nothing
-            , navigationKey = key
-            }
-
-        commands =
-            case token of
-                Just (Token tokenString) ->
-                    sendTokenToStorage tokenString
-
-                Nothing ->
-                    Cmd.none
+            Debug.log "maybeAccessToken" maybeAccessToken
     in
-    ( newModel, commands )
+    ( { url = url
+      , key = key
+      , page = About
+      , auth =
+            case maybeAccessToken of
+                Just token ->
+                    HasToken token
+
+                Nothing ->
+                    NotAuthed
+      }
+    , auth0GetUser auth0Token
+    )
 
 
 
@@ -93,18 +83,9 @@ init flags url key =
 
 type Msg
     = NoOp
-
-
-type Route
-    = SignIn String
-    | NotFound
-
-
-routeParser : Parser.Parser (Route -> a) a
-routeParser =
-    Parser.oneOf
-        [ Parser.map SignIn (Parser.s "signin" </> Parser.string)
-        ]
+    | GotAuth0Profile String (Result Http.Error UnverifiedUser)
+    | VerifiedUser String (Result Http.Error UserInfo)
+    | LogOut
 
 
 onUrlRequest : UrlRequest -> Msg
@@ -119,22 +100,136 @@ onUrlChange url =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    ( model, Cmd.none )
+    case msg of
+        GotAuth0Profile token result ->
+            case result of
+                Ok profile ->
+                    ( { model | auth = HasUnverifiedUser token profile }
+                    , verifyUser token profile
+                    )
+
+                Err err ->
+                    let
+                        _ =
+                            Debug.log "error" err
+                    in
+                    ( model, Cmd.none )
+
+        VerifiedUser token result ->
+            case result of
+                Ok profile ->
+                    ( { model | auth = Authenticated (LoggedInUser token profile) }
+                    , Cmd.batch
+                        [ Nav.pushUrl model.key "/feed"
+                        , saveAccessToken token
+                        ]
+                    )
+
+                Err err ->
+                    let
+                        _ =
+                            Debug.log "error" err
+                    in
+                    ( model, Cmd.none )
+
+        LogOut ->
+            ( { model | auth = NotAuthed }, Cmd.batch [ Nav.pushUrl model.key "about", removeAccessToken () ] )
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+auth0GetUser token =
+    Http.request
+        { method = "POST"
+        , headers = []
+        , url = auth0Endpoint ++ "/userinfo"
+        , body =
+            Http.jsonBody <|
+                Encode.object [ ( "access_token", Encode.string token ) ]
+        , expect =
+            Http.expectJson (GotAuth0Profile token) User.decodeFromAuth0
+        , timeout = Nothing
+        , tracker = Nothing
+        }
 
 
 
 ---- VIEW ----
 
 
+verifyUser : String -> UnverifiedUser -> Cmd Msg
+verifyUser token unVerifiedUser =
+    userRequest
+        { token = token
+        , method = "POST"
+        , url = "/user"
+        , body = Just (Http.jsonBody (unverifiedUserEncoder unVerifiedUser))
+        , expect = Http.expectJson (VerifiedUser token) userInfoDecoder
+        }
+
+
 view : Model -> Document Msg
 view model =
     { title =
-        "Distinctly Average"
+        "Jack Franklin"
     , body =
         [ img [ src "/logo.svg" ] []
         , h1 [] [ text "Your Elm App is working!" ]
+        , text (model.url |> Url.toString)
+        , br [] []
+        , text ("AuthStatus: " ++ viewAuthStatus model.auth)
+        , br [] []
+        , text ("Page: " ++ viewPage model.page)
+        , div []
+            [ button
+                [ type_ "button"
+                , href "#"
+                , onClick LogOut
+                ]
+                [ text "Logout" ]
+            , button
+                [ type_ "button"
+                , href "#"
+                , onClick LogOut
+                ]
+                [ text "Login" ]
+            , h2 [] [ a [ Attr.href auth0LoginUrl ] [ text "login" ] ]
+            ]
         ]
     }
+
+
+viewPage : Page -> String
+viewPage page =
+    case page of
+        NotFound ->
+            "NotFound"
+
+        About ->
+            "About"
+
+        LoggedIn ->
+            "LoggedIn"
+
+
+viewAuthStatus : AuthStatus -> String
+viewAuthStatus authStatus =
+    case authStatus of
+        NotAuthed ->
+            "NotAuthed"
+
+        AuthError error ->
+            "AuthError: " ++ error
+
+        HasToken token ->
+            "HasToken " ++ token
+
+        HasUnverifiedUser token profile ->
+            "HasUnverifiedUser"
+
+        Authenticated _ ->
+            "Authenticated"
 
 
 
@@ -147,10 +242,16 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = always Sub.none
+        , subscriptions = subscriptions
         , onUrlRequest = onUrlRequest
         , onUrlChange = onUrlChange
         }
 
 
-port sendTokenToStorage : String -> Cmd msg
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none

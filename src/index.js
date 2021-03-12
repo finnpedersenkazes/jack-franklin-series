@@ -1,17 +1,17 @@
 import './main.css';
 import { Elm } from './Main.elm';
-import * as serviceWorker from './serviceWorker';
+
+const startingAccessToken = localStorage.getItem('accessToken');
 
 const app = Elm.Main.init({
-  node: document.getElementById('root')
+  node: document.getElementById('root'),
+  flags: { maybeAccessToken: startingAccessToken }
 });
 
-app.ports.sendTokenToStorage.subscribe(token => {
-  console.log('GOT TOKEN ', token)
-  localStorage.setItem('__DISTINCTLY_AVERAGE__', token)
+app.ports.saveAccessToken.subscribe( function(accessToken) {
+    localStorage.setItem('accessToken', accessToken);
 });
 
-// If you want your app to work offline and load faster, you can change
-// unregister() to register() below. Note this comes with some pitfalls.
-// Learn more about service workers: https://bit.ly/CRA-PWA
-serviceWorker.unregister();
+app.ports.removeAccessToken.subscribe( function(accessToken) {
+    localStorage.removeItem('accessToken', accessToken);
+});
